@@ -1,9 +1,10 @@
 import { ensureSyntaxTree, tokenClassNodeProp } from '@codemirror/language';
 import {
+  ChangeSet,
   EditorState,
   RangeSetBuilder,
   StateEffect,
-  StateField,
+  StateField
 } from '@codemirror/state';
 import {
   Decoration,
@@ -11,7 +12,7 @@ import {
   EditorView,
   ViewPlugin,
   ViewUpdate,
-  WidgetType,
+  WidgetType
 } from '@codemirror/view';
 import { setIcon } from 'obsidian';
 
@@ -83,7 +84,7 @@ export const calloutsConfigField = StateField.define<CalloutConfig[]>({
   },
 });
 
-export function buildCalloutDecos(view: EditorView, state: EditorState) {
+export function buildCalloutDecos(view: EditorView, state: EditorState, startOfChange?: number, endOfChange?: number, lastDecorations?: DecorationSet) {
   const config = state.field(calloutsConfigField);
 
   if (!config.length || !view.visibleRanges.length) return Decoration.none;
@@ -96,8 +97,15 @@ export function buildCalloutDecos(view: EditorView, state: EditorState) {
   const { doc } = state;
 
   for (const { from, to } of view.visibleRanges) {
+    if (lastDecorations !== undefined) {
+      lastDecorations.between(
+        from,
+        startOfChange,
+        (from, to, decoration) => builder.add(from, to, decoration)
+      );
+    }
     tree.iterate({
-      from,
+      from: endOfChange !== undefined ? endOfChange : from,
       to,
       enter({ type, from, to }): false | void {
         const prop = type.prop(tokenClassNodeProp);
@@ -143,6 +151,29 @@ export function buildCalloutDecos(view: EditorView, state: EditorState) {
   return builder.finish();
 }
 
+function changeSetContainsAlphanumeric(changes: ChangeSet): boolean {
+  let found = false;
+  changes.iterChanges((fromA, toA, fromB, toB, inserted) => {
+    if (/^[a-z0-9]+$/i.test(inserted.toString())) {
+      found = true;
+      return;
+    }
+  })
+  return found;
+}
+
+function getChangeRange(changes: ChangeSet) {
+  let startOfChange, endOfChange;
+  changes.iterChangedRanges((fromA, toA, fromB, toB) => {
+    startOfChange = fromB;
+    endOfChange = toB;
+  });
+  return {
+    startOfChange,
+    endOfChange
+  };
+}
+
 export const calloutExtension = ViewPlugin.fromClass(
   class {
     decorations: DecorationSet;
@@ -159,7 +190,12 @@ export const calloutExtension = ViewPlugin.fromClass(
           tr.effects.some((e) => e.is(setConfig))
         )
       ) {
-        this.decorations = buildCalloutDecos(update.view, update.state);
+        if (update.changes !== undefined && changeSetContainsAlphanumeric(update.changes)) {
+          const { startOfChange, endOfChange } = getChangeRange(update.changes);
+          this.decorations = buildCalloutDecos(update.view, update.state, startOfChange, endOfChange, this.decorations);
+        } else {
+          this.decorations = buildCalloutDecos(update.view, update.state);
+        }
       }
     }
   },

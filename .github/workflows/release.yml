@@ -4,6 +4,8 @@ on:
   push:
     tags:
       - '*'
+env:
+    PLUGIN_NAME: obsidian-list-callouts
 
 jobs:
   build:
@@ -19,9 +21,12 @@ jobs:
 
       - name: Build plugin
         run: |
-          npm install -g yarn
-          yarn install
-          yarn build
+          npm install
+          npm run build
+          mkdir ${{ env.PLUGIN_NAME }}
+          cp main.js manifest.json ${{ env.PLUGIN_NAME }}
+          zip -r ${{ env.PLUGIN_NAME }}.zip ${{ env.PLUGIN_NAME }}
+          ls
 
       - name: Create release
         env:
@@ -32,4 +37,5 @@ jobs:
           gh release create "$tag" \
             --title="$tag" \
             --notes-file="release-notes.md" \
-            main.js manifest.json styles.css
+            main.js manifest.json styles.css \
+            ${{ env.PLUGIN_NAME }}.zip
