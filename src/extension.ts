@@ -100,7 +100,7 @@ export function buildCalloutDecos(view: EditorView, state: EditorState, startOfC
     if (lastDecorations !== undefined) {
       lastDecorations.between(
         from,
-        startOfChange,
+        Math.min(to, startOfChange),
         (from, to, decoration) => builder.add(from, to, decoration)
       );
     }
