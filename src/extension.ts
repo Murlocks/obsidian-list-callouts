@@ -97,7 +97,8 @@ export function buildCalloutDecos(view: EditorView, state: EditorState, startOfC
   const { doc } = state;
 
   for (const { from, to } of view.visibleRanges) {
-    if (lastDecorations !== undefined) {
+    // Re-use any decorations up til the start of our change
+    if (lastDecorations !== undefined && from < startOfChange) {
       lastDecorations.between(
         from,
         Math.min(to, startOfChange),
